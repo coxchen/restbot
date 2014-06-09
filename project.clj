@@ -1,4 +1,4 @@
-(defproject restbot "0.1.0"
+(defproject restbot "0.2.0"
   :description "A testing framework for RESTful/JSON API"
   :url "https://github.com/coxchen/restbot"
   :license {:name "Eclipse Public License"
@@ -12,6 +12,7 @@
                  [org.clojars.runa/clj-schema "0.9.4"]
                  [dire "0.4.4"]
                  [clj-time "0.6.0"]
-                 [org.clojure/core.async "0.1.267.0-0d7780-alpha"]]
+                 [org.clojure/core.async "0.1.267.0-0d7780-alpha"]
+                 [prismatic/plumbing "0.3.1"]]
   :plugins [[lein-gorilla "0.2.0"]]
   :main restbot.main)

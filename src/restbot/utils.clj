@@ -1,7 +1,7 @@
 (ns restbot.utils
   (:require [clojure.data.json :as json]
             [clj-time.core :as jt]
-            [clj-time.coerce :refer [from-long]]
+            [clj-time.coerce :as coerce]
             [clj-time.format :refer [formatter parse unparse]]))
 
 (defn quarter
@@ -15,6 +15,9 @@
 (def evtTimeFormat (formatter "yyyy-MM-dd+HH:mm:ss.SSS+z"))
 (def parse-time (partial parse evtTimeFormat))
 (def unparse-time (partial unparse evtTimeFormat))
+
+(def from-long coerce/from-long)
+(def to-long coerce/to-long)
 
 (defmulti joda-time class)
 (defmethod joda-time org.joda.time.DateTime [someTime] someTime)

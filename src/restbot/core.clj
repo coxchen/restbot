@@ -2,7 +2,9 @@
   (:require [clojure.data.json :as json]
             [clojure.string :as string]
             [clj-schema.validation :refer [validation-errors]]
-            [restbot.http :as http]))
+            [restbot.http :as http]
+            [plumbing.graph :as graph])
+  (:use [plumbing.core]))
 
 ;;;;;;;;;;;;;;;;;;;;
 
@@ -80,12 +82,29 @@
 ;; TASK
 ;;;;;;;;;;;;;;;;;;;;
 
+(defn- make-task-graph
+  [specs serverSym authSym]
+  (reduce merge
+          (for [[specKey specParam specBody] (partition 3 specs)]
+            {specKey (cons 'fnk
+                           (list (conj specParam serverSym authSym)
+                                 (list 'do! (list specBody
+                                                  :server-url (list :url serverSym))
+                                       :cookies (if-not (nil? authSym) (list :cookies authSym)))))})))
+
 (defmacro def-task
-  [taskName & taskBody]
-  `(do
-     (def ~taskName
-       {:name (str '~taskName) :tasks (conj [] ~@taskBody)})
-     (swap! tasks assoc (keyword '~taskName) ~taskName)))
+  [graphName & specs]
+  (let [server# (gensym 'server)
+        auth# (gensym 'auth)
+        no-op# (fn [])
+        tasks (make-task-graph specs server# auth#)
+        taskGraph (-> tasks
+                      (assoc (keyword auth#) `(fnk [] (~no-op#)))
+                      (with-meta {:auth-step (keyword auth#)
+                                  :server-key (keyword server#)}))]
+    `(do
+       (def ~graphName
+         ~taskGraph))))
 
 ;;;;;;;;;;;;;;;;;;;;
 ;; RUN!!!
@@ -99,17 +118,21 @@
       :PUT (apply http/put! req opts)
       (str "UNSUPPORTED REQUEST TYPE" (req :type)))))
 
+(defn- extract-auth-step
+  [server]
+  (condp = (get-in server [:auth :type])
+    :cookies (get-in server [:auth :req])
+    nil))
+
 (defn run!
-  [server & tasks]
-  (let [server-url (server :url)
-        do-fn (condp = (get-in server [:auth :type])
-                :cookies (let [auth-req (get-in server [:auth :req])
-                               {:keys [cookies error]} (do! (auth-req :server-url server-url))]
-                           (if error
-                             nil
-                             #(do! (% :server-url server-url) :cookies cookies)))
-                #(do! (% :server-url server-url)))]
-    (if do-fn (doall (map do-fn (mapcat :tasks tasks))))))
+  [server taskGraph]
+  (let [serverUrl (server :url)
+        authStepKey ((meta taskGraph) :auth-step)
+        serverKey ((meta taskGraph) :server-key)
+        execGraph (if-let [auth-step (extract-auth-step server)]
+                    (assoc taskGraph authStepKey (fnk [] (do! (auth-step :server-url serverUrl))))
+                    taskGraph)]
+    (into {} ((graph/compile execGraph) {serverKey server}))))
 
 ;;;;;;;;;;;;;;;;;;;;
 ;; LOG

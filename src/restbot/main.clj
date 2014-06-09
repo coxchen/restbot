@@ -92,7 +92,7 @@
   (println "run <server> <task> <args>    Run user-defined restbot tasks against certain server")
   (println "show <server>                 Show server info")
   (println "list server/task/api          List server/task/api defined in restbot.clj")
-  (println "upgrade                       Upgrade clojure-control to a latest version."))
+  (println "upgrade                       Upgrade restbot to a latest version."))
 
 (defn -main [ & args]
   (let [[options extra-args]
