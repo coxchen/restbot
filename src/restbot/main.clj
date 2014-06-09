@@ -20,6 +20,8 @@
     (binding [*ns* (create-restbot-ns)]
       (refer-clojure)
       (use '[restbot core utils])
+      (use '[plumbing.core])
+      (require '[plumbing.graph :as graph])
       (load-file
        (or @special-restbot-file (str (get-restbot-dir) "/restbot.clj"))))
     (catch java.io.FileNotFoundException e
