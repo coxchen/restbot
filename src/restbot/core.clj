@@ -97,6 +97,7 @@
   (let [server# (gensym 'server)
         auth# (gensym 'auth)
         no-op# (fn [])
+        graphKey (keyword graphName)
         tasks (make-task-graph specs server# auth#)
         taskGraph (-> tasks
                       (assoc (keyword auth#) `(fnk [] (~no-op#)))
@@ -104,7 +105,8 @@
                                   :server-key (keyword server#)}))]
     `(do
        (def ~graphName
-         ~taskGraph))))
+         ~taskGraph)
+       (swap! tasks assoc (keyword '~graphName) ~graphName))))
 
 ;;;;;;;;;;;;;;;;;;;;
 ;; RUN!!!

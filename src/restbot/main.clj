@@ -34,9 +34,10 @@
     (load-restbot-file)
     (if-let [server (get @servers (keyword (first args)))]
       (do
-        (when-let [targetTasks (select-keys @tasks (vec (map keyword (rest args))))]
-          (println "RUN on" (:name server) "with" (clojure.string/join (keys targetTasks)))
-          (apply run! server (vals targetTasks))
+        (when-let [targetTask (get @tasks (keyword (second args)))]
+          (let [taskKeys (keys (dissoc targetTask (:auth-step (meta targetTask))))]
+            (println "RUN on" (:name server) "with" (clojure.string/join taskKeys)))
+          (run! server targetTask)
           )
         )
     )))
