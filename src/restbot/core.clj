@@ -137,9 +137,13 @@
     (into {} ((graph/compile execGraph) {serverKey server}))))
 
 ;;;;;;;;;;;;;;;;;;;;
-;; LOG
+;; OTHERs
 ;;;;;;;;;;;;;;;;;;;;
 
 (defn current-log-level [] @http/LOG_LEVEL)
 
 (defn log-level [level] (dosync (ref-set http/LOG_LEVEL level)))
+
+(defn toggle-validation [] (dosync (ref-set http/DO_VALIDATION true)))
+
+(defn set-json-dir [jsonDir] (dosync (ref-set http/JSON_DIR jsonDir)))

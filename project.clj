@@ -1,4 +1,4 @@
-(defproject restbot "0.2.0"
+(defproject restbot "0.3.0"
   :description "A testing framework for RESTful/JSON API"
   :url "https://github.com/coxchen/restbot"
   :license {:name "Eclipse Public License"

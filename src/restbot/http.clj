@@ -19,6 +19,18 @@
                :key-fn (fn [k] (keyword k))
                :value-fn (fn [k v] v))))
 
+
+;;;;;;;;;;;;;;;;;;;;
+
+(def LOG_LEVEL (ref :INFO))
+
+(defmacro with-log-level
+  [logLevel & body]
+  `(if (= @LOG_LEVEL ~logLevel)
+    (do ~@body)))
+
+(def DO_VALIDATION (ref false))
+
 ;;;;;;;;;;;;;;;;;;;;
 ;; VALIDATION
 ;;;;;;;;;;;;;;;;;;;;
@@ -27,11 +39,9 @@
   [v-name v-fn toBeChecked]
   (let [errors (v-fn toBeChecked)]
     (do (if (> (count errors) 0)
-          (do
-            (println (str "[" v-name "]") (count errors) "errors")
-            (clojure.pprint/pprint errors)
-            )
-          (println (str "[" v-name "]") "passed")))
+          (do (println (str " - [" v-name "]") (count errors) "errors")
+              (with-log-level :DEBUG (clojure.pprint/pprint errors)))
+          (println (str " - [" v-name "]") "passed")))
     {v-name (not (> (count errors) 0))}))
 
 (defn validate-json
@@ -61,17 +71,14 @@
 ;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;
 
-(def LOG_LEVEL (ref :INFO))
-
 (defn- prn-resp
   [response]
-  (if (= @LOG_LEVEL :DEBUG)
-    (do
-      (println "   [KEYS] " (keys response)) ;; (:id :url :raw-url :status :headers :body :done :error)
-      (println " [STATUS] " (c/status response))
-      (println "[HEADERS] " (c/headers response))
-      (println "   [DONE] " (c/done? response))
-      (println "  [ERROR] " (c/error response)))))
+  (with-log-level :DEBUG
+    (println "   [KEYS] " (keys response)) ;; (:id :url :raw-url :status :headers :body :done :error)
+    (println " [STATUS] " (c/status response))
+    (println "[HEADERS] " (c/headers response))
+    (println "   [DONE] " (c/done? response))
+    (println "  [ERROR] " (c/error response))))
 
 (defn- handle-http-error
   [response]
@@ -92,10 +99,12 @@
         {:cookies (if ((c/headers response) :set-cookie) (c/cookies response))
          :resp (c/string response)}))))
 
+(def JSON_DIR (ref ""))
+
 (defn- handle-get-ok
   [api response timestamps]
   (let [{:keys [nowStamp tStart waitTime]} timestamps
-        jsonFilename (str (api :name) ".json")]
+        jsonFilename (str @JSON_DIR (api :name) ".json")]
     (with-open [wrt (io/writer jsonFilename)]
       (doseq [s (c/string response)]
         (.write wrt s)))
@@ -104,7 +113,7 @@
       {:resp (if (and jsonResp (api :resp))
                (assoc jsonResp :content ((api :resp) (get jsonResp :content)))
                jsonResp)
-       :valid? (if (and jsonResp (api :validations))
+       :valid? (if (and @DO_VALIDATION jsonResp (api :validations))
                  (apply validate-json (get jsonResp :content) (api :validations)))
        :now nowStamp :waitTime waitTime :recvTime recvTime
        :latency (with-precision 5 :rounding FLOOR (* 1M (bigdec (+ waitTime recvTime))))})))
@@ -125,7 +134,7 @@
 
 (with-pre-hook! #'put!
   (fn [api & opts]
-    (println "[put!]" (api :url))))
+    (println "\n[put!]" (api :url))))
 
 (with-post-hook! #'put!
   (fn [result]
@@ -133,7 +142,7 @@
 
 (with-pre-hook! #'get!
   (fn [api & opts]
-    (println "[get!]" (api :url))))
+    (println "\n[get!]" (api :url))))
 
 (with-post-hook! #'get!
   (fn [result]

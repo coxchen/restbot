@@ -1,7 +1,7 @@
 (ns restbot.main
   (:use [restbot.core])
   (:use [clojure.string :only [join]]
-        [clojure.tools.cli :only [cli]]
+        [clojure.tools.cli :only [parse-opts]]
         [clojure.java.io :only [file reader writer]])
   (:gen-class))
 
@@ -27,11 +27,17 @@
     (catch java.io.FileNotFoundException e
       (error (str "restbot file" (str (get-restbot-dir) "/restbot.clj") "not found.")))))
 
+(defn- init-json-dir []
+  (if-not (.isDirectory (java.io.File. "json"))
+    (.mkdir (java.io.File. "json")))
+  (set-json-dir "json/"))
+
 (defn run
   "Run tasks on a specific server"
   [ & args]
   (do
     (load-restbot-file)
+    (init-json-dir)
     (if-let [server (get @servers (keyword (first args)))]
       (do
         (when-let [targetTask (get @tasks (keyword (second args)))]
@@ -45,7 +51,7 @@
 (defn version
   "Print version for RestBot and the current JVM."
   []
-  (println "RestBot" (System/getProperty "RESTBOT_VER")
+  (println "RestBot" (System/getProperty "RESTBOT_VERSION")
            "on Java" (System/getProperty "java.version")
            (System/getProperty "java.vm.name")))
 
@@ -88,27 +94,39 @@
         (println "SERVER: " server)
         (println "   URL: " url)))))
 
-(defn print-help []
-  (println "Usage:restbot [-f restbot.clj] command args")
+(defn print-help [summary]
+  (println "Usage:restbot [-f restbot.clj] [-d] [-v] command args\n")
+  (println summary)
+  (println "----------")
   (println "Commands available:")
 ;;   (println "init                           Initialize restbot, create a sample restbot file in current folder")
-  (println "run <server> <task> <args>    Run user-defined restbot tasks against certain server")
+  (println "run <server> <task>           Run user-defined restbot tasks against certain server")
   (println "show <server>                 Show server info")
-  (println "list server/task/api          List server/task/api defined in restbot.clj")
+  (println "list <server/task/api>        List server/task/api defined in restbot.clj")
   (println "upgrade                       Upgrade restbot to a latest version."))
 
+(def cli-opts
+  [["-f" "--file" "Which restbot file to be executed."]
+   ["-d" nil "Output debug message"
+    :id :debug :default false
+    :assoc-fn (fn [m k _] (update-in m [k] not))]
+   ["-v" nil "Perform validation on JSON response"
+    :id :validation :default false
+    :assoc-fn (fn [m k _] (update-in m [k] not))]
+   ])
+
 (defn -main [ & args]
-  (let [[options extra-args]
-        (cli args ["-f" "--file" "Which restbot file to be executed."])
-        {:keys [file]} options
-        cmd (first extra-args)
-        args (next extra-args)]
-    (when file
-      (reset! special-restbot-file file))
+  (let [{:keys [options arguments summary]} (parse-opts args cli-opts)
+        {:keys [file debug validation]} options
+        cmd (first arguments)
+        args (next arguments)]
+    (when file (reset! special-restbot-file file))
+    (when debug (log-level :DEBUG))
+    (when validation (toggle-validation))
     (case cmd
 ;;       "init" (apply init args)
       "run" (apply run args)
       "list" (apply list-things args)
       "show" (apply show args)
       "version" (apply version args)
-      (print-help))))
+      (print-help summary))))
