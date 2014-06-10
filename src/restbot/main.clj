@@ -51,7 +51,7 @@
 (defn version
   "Print version for RestBot and the current JVM."
   []
-  (println "RestBot" (System/getProperty "RESTBOT_VERSION")
+  (println "RestBot" (System/getenv "RESTBOT_VERSION")
            "on Java" (System/getProperty "java.version")
            (System/getProperty "java.vm.name")))
 
