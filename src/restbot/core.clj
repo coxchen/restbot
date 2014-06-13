@@ -52,7 +52,7 @@
 
 (defmacro def-api
   [apiName apiMethod apiUrl & apiMore]
-  (let [{:keys [headers body validations]} apiMore
+  (let [{:keys [headers body validations stream?]} apiMore
         apiKeyword (keyword apiName)]
     `(do
        (defn ~apiName [& apiOpts#]
@@ -65,6 +65,7 @@
                         (if ~'params (apply-api-params ~apiUrl ~'params) ~apiUrl))
               :headers (if ~'headers ~'headers ~headers)
               :body (if ~'body ~'body ~body)
+              :stream? ~stream?
               :resp ~'resp
               :validations ~validations})))
        (swap! apis assoc ~apiKeyword {:name (str '~apiName)

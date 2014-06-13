@@ -106,8 +106,10 @@
   (let [{:keys [nowStamp tStart waitTime]} timestamps
         jsonFilename (str @JSON_DIR (api :name) ".json")]
     (with-open [wrt (io/writer jsonFilename)]
-      (doseq [s (c/string response)]
-        (.write wrt s)))
+      (if (api :stream?)
+        (doseq [s (c/string response)]
+          (.write wrt s))
+        (.write wrt (c/string response))))
     (let [recvTime (format-time (- (elapsed-since tStart) waitTime))
           jsonResp (valid-json-file jsonFilename)]
       {:resp (if (and jsonResp (api :resp))
@@ -122,7 +124,9 @@
   [api & opts]
   (with-open [client (c/create-client :connection-timeout CONN_TIMEOUT :request-timeout GET_TIMEOUT)]
     (let [{:keys [cookies resp]} opts
-          response (c/stream-seq client :get (api :url) :cookies cookies :timeout GET_TIMEOUT)
+          response (if (api :stream?)
+                     (c/stream-seq client :get (api :url) :cookies cookies :timeout GET_TIMEOUT)
+                     (c/GET client (api :url) :cookies cookies :timeout GET_TIMEOUT))
           nowStamp (jt/now)
           tStart (. System (nanoTime))
           waitTime (elapsed-since tStart)
@@ -142,7 +146,7 @@
 
 (with-pre-hook! #'get!
   (fn [api & opts]
-    (println "\n[get!]" (api :url))))
+    (println "\n[get!]" (api :url) "stream?" (api :stream?))))
 
 (with-post-hook! #'get!
   (fn [result]
