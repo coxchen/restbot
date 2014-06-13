@@ -109,7 +109,9 @@
       (if (api :stream?)
         (doseq [s (c/string response)]
           (.write wrt s))
-        (.write wrt (c/string response))))
+        (do
+          (c/await response)
+          (.write wrt (c/string response)))))
     (let [recvTime (format-time (- (elapsed-since tStart) waitTime))
           jsonResp (valid-json-file jsonFilename)]
       {:resp (if (and jsonResp (api :resp))
@@ -135,6 +137,19 @@
       (if-let [error (handle-http-error response)]
         (assoc error :now nowStamp)
         (handle-get-ok api response timestamps)))))
+
+(defn post!
+  [api & opts]
+  (with-open [client (c/create-client :connection-timeout CONN_TIMEOUT :request-timeout GET_TIMEOUT)]
+    (let [{:keys [cookies resp]} opts
+          response (c/POST client (api :url) :headers (api :headers) :body (api :body)
+                           :cookies cookies :timeout GET_TIMEOUT)
+          nowStamp (jt/now)]
+      (c/await response)
+      (prn-resp response)
+      (if-let [error (handle-http-error response)]
+        (assoc error :now nowStamp)
+        {:resp (c/string response) :now nowStamp}))))
 
 (with-pre-hook! #'put!
   (fn [api & opts]
