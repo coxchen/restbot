@@ -101,7 +101,7 @@
 
 (def JSON_DIR (ref ""))
 
-(defn- handle-get-ok
+(defn- handle-http-ok
   [api response timestamps]
   (let [{:keys [nowStamp tStart waitTime]} timestamps
         jsonFilename (str @JSON_DIR (api :name) ".json")]
@@ -136,7 +136,7 @@
       (prn-resp response)
       (if-let [error (handle-http-error response)]
         (assoc error :now nowStamp)
-        (handle-get-ok api response timestamps)))))
+        (handle-http-ok api response timestamps)))))
 
 (defn post!
   [api & opts]
@@ -144,12 +144,28 @@
     (let [{:keys [cookies resp]} opts
           response (c/POST client (api :url) :headers (api :headers) :body (api :body)
                            :cookies cookies :timeout GET_TIMEOUT)
-          nowStamp (jt/now)]
-      (c/await response)
+          nowStamp (jt/now)
+          tStart (. System (nanoTime))
+          waitTime (elapsed-since tStart)
+          timestamps {:nowStamp nowStamp :tStart tStart :waitTime waitTime}]
       (prn-resp response)
       (if-let [error (handle-http-error response)]
         (assoc error :now nowStamp)
-        {:resp (c/string response) :now nowStamp}))))
+        (handle-http-ok api response timestamps)))))
+
+(defn del!
+  [api & opts]
+  (with-open [client (c/create-client :connection-timeout CONN_TIMEOUT :request-timeout GET_TIMEOUT)]
+    (let [{:keys [cookies resp]} opts
+          response (c/DELETE client (api :url) :cookies cookies :timeout GET_TIMEOUT)
+          nowStamp (jt/now)
+          tStart (. System (nanoTime))
+          waitTime (elapsed-since tStart)
+          timestamps {:nowStamp nowStamp :tStart tStart :waitTime waitTime}]
+      (prn-resp response)
+      (if-let [error (handle-http-error response)]
+        (assoc error :now nowStamp)
+        (handle-http-ok api response timestamps)))))
 
 (with-pre-hook! #'put!
   (fn [api & opts]
@@ -167,4 +183,18 @@
   (fn [result]
     (println "[get!]" result)))
 
+(with-pre-hook! #'post!
+  (fn [api & opts]
+    (println "\n[post!]" (api :url) "with BODY" (api :body))))
 
+(with-post-hook! #'post!
+  (fn [result]
+    (println "[post!]" result)))
+
+(with-pre-hook! #'del!
+  (fn [api & opts]
+    (println "\n[del!]" (api :url))))
+
+(with-post-hook! #'del!
+  (fn [result]
+    (println "[del!]" result)))
