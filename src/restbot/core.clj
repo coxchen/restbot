@@ -130,10 +130,12 @@
 (defn do!
   [req & opts]
   (let [req (if (fn? req) (req) req)]
-    (condp = (:method req)
-      :GET (apply http/get! req opts)
-      :PUT (apply http/put! req opts)
-      (str "UNSUPPORTED REQUEST TYPE" (:method req)))))
+    (condp = (get req :method)
+      :GET  (apply http/get! req opts)
+      :PUT  (apply http/put! req opts)
+      :POST (apply http/post! req opts)
+      :DEL  (apply http/del! req opts)
+      (str "UNSUPPORTED REQUEST TYPE" (get req :method)))))
 
 (defn- extract-auth-step
   [server]

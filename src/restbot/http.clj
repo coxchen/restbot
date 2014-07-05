@@ -101,13 +101,17 @@
 
 (def JSON_DIR (ref ""))
 
-(defn- handle-get-ok
+(defn- handle-http-ok
   [api response timestamps]
   (let [{:keys [nowStamp tStart waitTime]} timestamps
         jsonFilename (str @JSON_DIR (get api :name) ".json")]
     (with-open [wrt (io/writer jsonFilename)]
-      (doseq [s (c/string response)]
-        (.write wrt s)))
+      (if (get api :stream?)
+        (doseq [s (c/string response)]
+          (.write wrt s))
+        (do
+          (c/await response)
+          (.write wrt (c/string response)))))
     (let [recvTime (format-time (- (elapsed-since tStart) waitTime))
           jsonResp (valid-json-file jsonFilename)]
       {:resp (if (and jsonResp (get api :resp))
@@ -122,7 +126,9 @@
   [api & opts]
   (with-open [client (c/create-client :connection-timeout CONN_TIMEOUT :request-timeout GET_TIMEOUT)]
     (let [{:keys [cookies resp]} opts
-          response (c/stream-seq client :get (get api :url) :cookies cookies :timeout GET_TIMEOUT)
+          response (if (get api :stream?)
+                     (c/stream-seq client :get (get api :url) :cookies cookies :timeout GET_TIMEOUT)
+                     (c/GET client (get api :url) :cookies cookies :timeout GET_TIMEOUT))
           nowStamp (jt/now)
           tStart (. System (nanoTime))
           waitTime (elapsed-since tStart)
@@ -130,7 +136,36 @@
       (prn-resp response)
       (if-let [error (handle-http-error response)]
         (assoc error :now nowStamp)
-        (handle-get-ok api response timestamps)))))
+        (handle-http-ok api response timestamps)))))
+
+(defn post!
+  [api & opts]
+  (with-open [client (c/create-client :connection-timeout CONN_TIMEOUT :request-timeout GET_TIMEOUT)]
+    (let [{:keys [cookies resp]} opts
+          response (c/POST client (get api :url) :headers (get api :headers) :body (get api :body)
+                           :cookies cookies :timeout GET_TIMEOUT)
+          nowStamp (jt/now)
+          tStart (. System (nanoTime))
+          waitTime (elapsed-since tStart)
+          timestamps {:nowStamp nowStamp :tStart tStart :waitTime waitTime}]
+      (prn-resp response)
+      (if-let [error (handle-http-error response)]
+        (assoc error :now nowStamp)
+        (handle-http-ok api response timestamps)))))
+
+(defn del!
+  [api & opts]
+  (with-open [client (c/create-client :connection-timeout CONN_TIMEOUT :request-timeout GET_TIMEOUT)]
+    (let [{:keys [cookies resp]} opts
+          response (c/DELETE client (get api :url) :cookies cookies :timeout GET_TIMEOUT)
+          nowStamp (jt/now)
+          tStart (. System (nanoTime))
+          waitTime (elapsed-since tStart)
+          timestamps {:nowStamp nowStamp :tStart tStart :waitTime waitTime}]
+      (prn-resp response)
+      (if-let [error (handle-http-error response)]
+        (assoc error :now nowStamp)
+        (handle-http-ok api response timestamps)))))
 
 (with-pre-hook! #'put!
   (fn [api & opts]
@@ -142,10 +177,24 @@
 
 (with-pre-hook! #'get!
   (fn [api & opts]
-    (println "\n[get!]" (get api :url))))
+    (println "\n[get!]" (get api :url) "stream?" (get api :stream?))))
 
 (with-post-hook! #'get!
   (fn [result]
     (println "[get!]" result)))
 
+(with-pre-hook! #'post!
+  (fn [api & opts]
+    (println "\n[post!]" (get api :url) "with BODY" (get api :body))))
 
+(with-post-hook! #'post!
+  (fn [result]
+    (println "[post!]" result)))
+
+(with-pre-hook! #'del!
+  (fn [api & opts]
+    (println "\n[del!]" (get api :url))))
+
+(with-post-hook! #'del!
+  (fn [result]
+    (println "[del!]" result)))
