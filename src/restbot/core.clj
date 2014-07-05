@@ -50,23 +50,33 @@
   [apiUrl paramMap]
   (reduce replace-with-param (into [apiUrl] paramMap)))
 
+(defprotocol ReqBuilder
+  (-req [this apiOpts])
+  (-runtime [this apiRuntime]))
+
+(defrecord Api [name method url headers body stream? resp validations]
+  ReqBuilder
+  (-req [this apiOpts]
+        (let [{:keys [params]} apiOpts
+              url (apply-api-params (:url this) params)]
+          (map->Api (-> this
+                        (merge {:url url})
+                        (merge (apply hash-map apiOpts))))))
+  (-runtime [this apiRuntime]
+            (let [{:keys [server-url]} apiRuntime
+                  runtime-url (str server-url (:url this))]
+              (map->Api (-> this (merge {:url runtime-url}))))))
+
+(defn req [this & apiOpts] (-req this apiOpts))
+(defn runtime [this & apiRuntime] (-runtime this apiRuntime))
+
 (defmacro def-api
   [apiName apiMethod apiUrl & apiMore]
-  (let [{:keys [headers body validations]} apiMore
-        apiKeyword (keyword apiName)]
+  (let [apiKeyword (keyword apiName)]
     `(do
-       (defn ~apiName [& apiOpts#]
-         (fn [& apiRuntime#]
-           (let [{:keys [~'body ~'headers ~'params ~'resp]} apiOpts#
-                 {:keys [~'server-url]} apiRuntime#]
-             {:name (str '~apiName)
-              :method ~apiMethod
-              :url (str ~'server-url
-                        (if ~'params (apply-api-params ~apiUrl ~'params) ~apiUrl))
-              :headers (if ~'headers ~'headers ~headers)
-              :body (if ~'body ~'body ~body)
-              :resp ~'resp
-              :validations ~validations})))
+       (def ~apiName
+         (map->Api (merge ~(apply hash-map apiMore)
+                          {:name (str '~apiName) :method ~apiMethod :url ~apiUrl})))
        (swap! apis assoc ~apiKeyword {:name (str '~apiName)
                                       :method ~apiMethod
                                       :url ~apiUrl}))))
@@ -82,15 +92,20 @@
 ;; TASK
 ;;;;;;;;;;;;;;;;;;;;
 
+(defn handle-spec-body
+  [specBody serverSym authSym]
+  (list 'do! (list 'runtime (cons 'req specBody)
+                   :server-url (list :url serverSym))
+        :cookies (if-not (nil? authSym) (list :cookies authSym))))
+
+
 (defn- make-task-graph
   [specs serverSym authSym]
   (reduce merge
           (for [[specKey specParam specBody] (partition 3 specs)]
             {specKey (cons 'fnk
                            (list (conj specParam serverSym authSym)
-                                 (list 'do! (list specBody
-                                                  :server-url (list :url serverSym))
-                                       :cookies (if-not (nil? authSym) (list :cookies authSym)))))})))
+                                 (handle-spec-body specBody serverSym authSym)))})))
 
 (defmacro def-task
   [graphName & specs]
@@ -115,10 +130,10 @@
 (defn do!
   [req & opts]
   (let [req (if (fn? req) (req) req)]
-    (condp = (req :method)
+    (condp = (:method req)
       :GET (apply http/get! req opts)
       :PUT (apply http/put! req opts)
-      (str "UNSUPPORTED REQUEST TYPE" (req :type)))))
+      (str "UNSUPPORTED REQUEST TYPE" (:method req)))))
 
 (defn- extract-auth-step
   [server]

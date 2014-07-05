@@ -91,7 +91,7 @@
 (defn put!
   [api & opts]
   (with-open [client (c/create-client :connection-timeout CONN_TIMEOUT)]
-    (let [response (c/PUT client (api :url) :headers (api :headers) :body (api :body))]
+    (let [response (c/PUT client (get api :url) :headers (get api :headers) :body (get api :body))]
       (c/await response)
       (prn-resp response)
       (if-let [error (handle-http-error response)]
@@ -104,17 +104,17 @@
 (defn- handle-get-ok
   [api response timestamps]
   (let [{:keys [nowStamp tStart waitTime]} timestamps
-        jsonFilename (str @JSON_DIR (api :name) ".json")]
+        jsonFilename (str @JSON_DIR (get api :name) ".json")]
     (with-open [wrt (io/writer jsonFilename)]
       (doseq [s (c/string response)]
         (.write wrt s)))
     (let [recvTime (format-time (- (elapsed-since tStart) waitTime))
           jsonResp (valid-json-file jsonFilename)]
-      {:resp (if (and jsonResp (api :resp))
-               (assoc jsonResp :content ((api :resp) (get jsonResp :content)))
+      {:resp (if (and jsonResp (get api :resp))
+               (assoc jsonResp :content ((get api :resp) (get jsonResp :content)))
                jsonResp)
-       :valid? (if (and @DO_VALIDATION jsonResp (api :validations))
-                 (apply validate-json (get jsonResp :content) (api :validations)))
+       :valid? (if (and @DO_VALIDATION jsonResp (get api :validations))
+                 (apply validate-json (get jsonResp :content) (get api :validations)))
        :now nowStamp :waitTime waitTime :recvTime recvTime
        :latency (with-precision 5 :rounding FLOOR (* 1M (bigdec (+ waitTime recvTime))))})))
 
@@ -122,7 +122,7 @@
   [api & opts]
   (with-open [client (c/create-client :connection-timeout CONN_TIMEOUT :request-timeout GET_TIMEOUT)]
     (let [{:keys [cookies resp]} opts
-          response (c/stream-seq client :get (api :url) :cookies cookies :timeout GET_TIMEOUT)
+          response (c/stream-seq client :get (get api :url) :cookies cookies :timeout GET_TIMEOUT)
           nowStamp (jt/now)
           tStart (. System (nanoTime))
           waitTime (elapsed-since tStart)
@@ -134,7 +134,7 @@
 
 (with-pre-hook! #'put!
   (fn [api & opts]
-    (println "\n[put!]" (api :url))))
+    (println "\n[put!]" (get api :url))))
 
 (with-post-hook! #'put!
   (fn [result]
@@ -142,7 +142,7 @@
 
 (with-pre-hook! #'get!
   (fn [api & opts]
-    (println "\n[get!]" (api :url))))
+    (println "\n[get!]" (get api :url))))
 
 (with-post-hook! #'get!
   (fn [result]
