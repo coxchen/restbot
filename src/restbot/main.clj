@@ -32,21 +32,22 @@
     (.mkdir (java.io.File. "json")))
   (set-json-dir "json/"))
 
+(defn run-restbot
+  [args]
+  (if-let [server (get @servers (keyword (first args)))]
+    (do
+      (when-let [targetTask (get @tasks (keyword (second args)))]
+        (let [taskKeys (keys (dissoc targetTask (:auth-step (meta targetTask))))]
+          (println "RUN on" (:name server) "with" (clojure.string/join taskKeys)))
+        (run! server targetTask)))))
+
 (defn run
   "Run tasks on a specific server"
   [ & args]
   (do
     (load-restbot-file)
     (init-json-dir)
-    (if-let [server (get @servers (keyword (first args)))]
-      (do
-        (when-let [targetTask (get @tasks (keyword (second args)))]
-          (let [taskKeys (keys (dissoc targetTask (:auth-step (meta targetTask))))]
-            (println "RUN on" (:name server) "with" (clojure.string/join taskKeys)))
-          (run! server targetTask)
-          )
-        )
-    )))
+    (run-restbot args)))
 
 (defn version
   "Print version for RestBot and the current JVM."

@@ -88,6 +88,10 @@
      (and status (>= (status :code) 400)) {:error (select-keys status [:code :msg])}
      ((comp not nil?) error) {:error error})))
 
+(defn- set-cookie?
+  [response]
+  (not-empty ((c/headers response) :set-cookie)))
+
 (defn put!
   [api & opts]
   (with-open [client (c/create-client :connection-timeout CONN_TIMEOUT)]
@@ -96,7 +100,7 @@
       (prn-resp response)
       (if-let [error (handle-http-error response)]
         error
-        {:cookies (if ((c/headers response) :set-cookie) (c/cookies response))
+        {:cookies (if (set-cookie? response) (c/cookies response))
          :resp (c/string response)}))))
 
 (def JSON_DIR (ref ""))
@@ -117,6 +121,7 @@
       {:resp (if (and jsonResp (get api :resp))
                (assoc jsonResp :content ((get api :resp) (get jsonResp :content)))
                jsonResp)
+       :cookies (if (set-cookie? response) (c/cookies response))
        :valid? (if (and @DO_VALIDATION jsonResp (get api :validations))
                  (apply validate-json (get jsonResp :content) (get api :validations)))
        :now nowStamp :waitTime waitTime :recvTime recvTime

@@ -149,7 +149,7 @@
         authStepKey ((meta taskGraph) :auth-step)
         serverKey ((meta taskGraph) :server-key)
         execGraph (if-let [auth-step (extract-auth-step server)]
-                    (assoc taskGraph authStepKey (fnk [] (do! (auth-step :server-url serverUrl))))
+                    (assoc taskGraph authStepKey (fnk [] (do! (runtime auth-step :server-url serverUrl))))
                     taskGraph)]
     (into {} ((graph/compile execGraph) {serverKey server}))))
 
@@ -164,3 +164,4 @@
 (defn toggle-validation [] (dosync (ref-set http/DO_VALIDATION true)))
 
 (defn set-json-dir [jsonDir] (dosync (ref-set http/JSON_DIR jsonDir)))
+
