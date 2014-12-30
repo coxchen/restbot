@@ -108,6 +108,7 @@
 (defn- handle-http-ok
   [api response timestamps]
   (let [{:keys [nowStamp tStart waitTime]} timestamps
+;;         jsonFilename (str @JSON_DIR (get api :name) "." tStart ".json")]
         jsonFilename (str @JSON_DIR (get api :name) ".json")]
     (with-open [wrt (io/writer jsonFilename)]
       (if (get api :stream?)

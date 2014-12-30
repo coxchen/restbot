@@ -33,21 +33,22 @@
   (set-json-dir "json/"))
 
 (defn run-restbot
-  [args]
+  [times args]
   (if-let [server (get @servers (keyword (first args)))]
     (do
       (when-let [targetTask (get @tasks (keyword (second args)))]
         (let [taskKeys (keys (dissoc targetTask (:auth-step (meta targetTask))))]
-          (println "RUN on" (:name server) "with" (clojure.string/join taskKeys)))
-        (run! server targetTask)))))
+          (println "RUN on" (:name server) "with" (clojure.string/join taskKeys))
+        (run! times server targetTask))
+        nil))))
 
 (defn run
   "Run tasks on a specific server"
-  [ & args]
+  [times & args]
   (do
     (load-restbot-file)
     (init-json-dir)
-    (run-restbot args)))
+    (run-restbot times args)))
 
 (defn version
   "Print version for RestBot and the current JVM."
@@ -72,17 +73,8 @@
     (if-let [category (first args)]
       (condp = (keyword category)
         :server (show-things @servers #(str "- [" (get % :name) "] " (get % :url)))
-        :task (show-things
-               @tasks
-               #(str "# " (get % :name) "\n"
-                     (clojure.string/join "\n"
-                      (map (fn [t] (format "  - %s" t))
-                           (into [] (for [task (get % :tasks)]
-                                      (let [t (apply task nil)]
-                                        (str "[" (name (:method t)) "]["
-                                             (:name t nil) "] " (:url t)))))))))
-        :api (show-things @apis #(str "- [" (name (get % :method)) "][" (get % :name) "]\n  "
-                                      (get % :url)))))))
+        :task (show-things @tasks #(str "# " (get % :name) "\n  -> " (get % :tasks)))
+        :api (show-things @apis #(str "- [" (name (get % :method)) "][" (get % :name) "]\n  " (get % :url)))))))
 
 (defn show
   "Show server info"
@@ -107,18 +99,22 @@
   (println "upgrade                       Upgrade restbot to a latest version."))
 
 (def cli-opts
-  [["-f" "--file" "Which restbot file to be executed."]
+  [["-f" "--file FILE" "Which restbot file to be executed."]
    ["-d" nil "Output debug message"
     :id :debug :default false
     :assoc-fn (fn [m k _] (update-in m [k] not))]
    ["-v" nil "Perform validation on JSON response"
     :id :validation :default false
     :assoc-fn (fn [m k _] (update-in m [k] not))]
+   ["-t" "--times TIMES" "Run task for several TIMES."
+    :id :times
+    :default 1
+    :parse-fn #(Integer/parseInt %)]
    ])
 
 (defn -main [ & args]
   (let [{:keys [options arguments summary]} (parse-opts args cli-opts)
-        {:keys [file debug validation]} options
+        {:keys [file debug validation times]} options
         cmd (first arguments)
         args (next arguments)]
     (when file (reset! special-restbot-file file))
@@ -126,7 +122,7 @@
     (when validation (toggle-validation))
     (case cmd
 ;;       "init" (apply init args)
-      "run" (apply run args)
+      "run" (apply run times args)
       "list" (apply list-things args)
       "show" (apply show args)
       "version" (apply version args)

@@ -113,15 +113,17 @@
         auth# (gensym 'auth)
         no-op# (fn [])
         graphKey (keyword graphName)
-        tasks (make-task-graph specs server# auth#)
-        taskGraph (-> tasks
+        innerTasks (make-task-graph specs server# auth#)
+        taskNames (into [] (map first (partition 3 specs)))
+        taskGraph (-> innerTasks
                       (assoc (keyword auth#) `(fnk [] (~no-op#)))
                       (with-meta {:auth-step (keyword auth#)
                                   :server-key (keyword server#)}))]
     `(do
        (def ~graphName
          ~taskGraph)
-       (swap! tasks assoc (keyword '~graphName) ~graphName))))
+       (swap! tasks assoc (keyword '~graphName) {:name (str '~graphName)
+                                                 :tasks ~taskNames}))))
 
 ;;;;;;;;;;;;;;;;;;;;
 ;; RUN!!!
@@ -144,14 +146,19 @@
     nil))
 
 (defn run!
-  [server taskGraph]
+  [times server taskGraph]
   (let [serverUrl (server :url)
         authStepKey ((meta taskGraph) :auth-step)
         serverKey ((meta taskGraph) :server-key)
         execGraph (if-let [auth-step (extract-auth-step server)]
                     (assoc taskGraph authStepKey (fnk [] (do! (runtime auth-step :server-url serverUrl))))
-                    taskGraph)]
-    (into {} ((graph/compile execGraph) {serverKey server}))))
+                    taskGraph)
+        compiled (graph/compile execGraph)]
+;;     (into {} ((graph/compile execGraph) {serverKey server}))))
+    (dotimes [t times]
+      (println "\n# RUN" (str "[" t "]"))
+      (compiled {serverKey server}))
+    ))
 
 ;;;;;;;;;;;;;;;;;;;;
 ;; OTHERs
