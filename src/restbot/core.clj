@@ -123,6 +123,7 @@
        (def ~graphName
          ~taskGraph)
        (swap! tasks assoc (keyword '~graphName) {:name (str '~graphName)
+                                                 :graph ~graphName
                                                  :tasks ~taskNames}))))
 
 ;;;;;;;;;;;;;;;;;;;;
