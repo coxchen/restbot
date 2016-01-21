@@ -116,7 +116,7 @@
           (.write wrt s))
         (do
           (c/await response)
-          (.write wrt (c/string response)))))
+          (if-let [serverResp (c/string response)] (.write wrt serverResp)))))
     (let [recvTime (format-time (- (elapsed-since tStart) waitTime))
           jsonResp (valid-json-file jsonFilename)]
       {:resp (if (and jsonResp (get api :resp))
@@ -183,7 +183,7 @@
 
 (with-pre-hook! #'get!
   (fn [api & opts]
-    (println "\n[get!]" (get api :url) "stream?" (get api :stream?))))
+    (println "\n[get!]" (get api :url) "stream?" (get api :stream?) "api-keys: " (keys api))))
 
 (with-post-hook! #'get!
   (fn [result]
